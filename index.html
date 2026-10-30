@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estrella 3D</title>
+</head>
+<body>
+
+  <canvas id="lienzo"></canvas>
+
+  <!-- Textos sobre la escena (HUD) -->
+  <div class="hud hud--tl">
+    <span class="hud__label">Pointer</span>
+    <span id="pointer-coords">X — · Y —</span>
+    <span id="pointer-normalized">NX — · NY —</span>
+  </div>
+
+  <div class="hud hud--tr">
+    <span class="hud__label">Mexico City</span>
+    <span id="clock-date">—</span>
+    <span id="clock-time">—</span>
+    <span id="clock-zone">—</span>
+  </div>
+
+  <p class="hud hud--bottom">Push the particles around</p>
+
+  <!-- Control de cantidad de partículas -->
+  <div class="hud hud--bl controls">
+    <label class="hud__label" for="particle-count">Particles</label>
+
+    <div class="controls__row">
+      <input
+        id="particle-count"
+        class="controls__slider"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="30"
+      >
+      <output id="particle-count-value" class="controls__value" for="particle-count">030</output>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
