@@ -2,7 +2,6 @@ import './style.css';
 import * as THREE from 'three';
 console.log("estrella-3d. Rotación con remapeo + mini estrellas empujables + HUD + control de partículas.");
 
-// Obtener referencias a los elementos del DOM ---------------------------------------------------------------
 const lienzo = document.getElementById("lienzo");
 
 const pointerCoordsContainer = document.getElementById("pointer-coords");
@@ -13,14 +12,10 @@ const clockZoneContainer = document.getElementById("clock-zone");
 
 const particleSlider = document.getElementById("particle-count");
 const particleValue = document.getElementById("particle-count-value");
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Definición de variables y constantes ---------------------------------------------------------------
+//---------Variables---------
 let pointerData = {
   x: window.innerWidth / 2,
   y: window.innerHeight / 2
@@ -31,12 +26,13 @@ let normalizedPointer = {
   y: 0
 };
 
-let normalizedLerpPointer = {   // suavizado para la cabeza
+let normalizedLerpPointer = {   
   x: 0,
   y: 0
 };
 
-let pupilLerpPointer = {        // suavizado para las pupilas (más rápido)
+//Suavizado de las pupilas
+let pupilLerpPointer = {
   x: 0,
   y: 0
 };
@@ -46,46 +42,51 @@ let headRotation = {
   y: 0
 };
 
-const COF = 0.08;               // Coefficient of friction de la cabeza
-const PUPIL_COF = 0.18;         // las pupilas reaccionan más rápido que la cabeza
+//COF
+const COF = 0.08; //COF de la cabeza
+const PUPIL_COF = 0.18; //COF de las pupilas
 
-const HEAD_RANGE = {            // grados máximos de rotación de la cabeza
+//rango de giro de la cabeza
+const HEAD_RANGE = {            
   x: 25,
   y: 35
 };
 
-const EYE_SHAPE = {
-  height: 1.5,                  // alto del diamante respecto a su ancho
-  pupilSize: 0.4,               // tamaño de la pupila respecto al ojo
-  pupilTravel: 0.9              // qué tanto del espacio libre recorre la pupila (1 = toca el borde)
+//ojos
+const EYE_SHAPE = {             
+  height: 1.5,                  
+  pupilSize: 0.4,               
+  pupilTravel: 0.9              
 };
 
 const COLORS = {
   head: "#c00202",
-  mini: "#ff0000",              // color de las mini estrellas (cámbialo si quieres contraste)
+  mini: "#ff0000",
   eye: "#f4f1ea",
   pupil: "#111111"
 };
 
-const SPIKES = {                // picos de la cabeza principal
-  count: 26,                    // cuántos picos se reparten alrededor de la esfera
-  length: 1.0,                  // largo de cada pico
-  width: 0.28,                  // grosor de la base de cada pico
-  frontGap: 0.55                // deja libre la cara frontal para los ojos (0 a 1)
+//Picos de la cabeza
+const SPIKES = { 
+  count: 26, 
+  length: 1.0,                 
+  width: 0.28,                 
+  frontGap: 0.55 
 };
 
-const MINIS = {                 // mini estrellas puntiagudas flotando alrededor
-  count: 30,                    // cuántas hay al cargar la página
-  maxCount: 100,                // máximo que permite el slider
-  spikeCount: 14,               // picos de cada una
-  spikeLength: 1.0,             // largo de los picos (relativo a su tamaño)
-  spikeWidth: 0.32,             // grosor de los picos (relativo a su tamaño)
-  size: 0.1,                    // tamaño base de cada mini estrella
-  minRadius: 2.3,               // distancia mínima al centro (para no chocar con la cabeza)
-  maxRadius: 3.3,               // distancia máxima al centro
-  height: 1.8,                  // qué tan arriba/abajo pueden aparecer
-  followHead: 0.3,              // cuánto siguen al mouse (0 = nada, 1 = igual que la cabeza)
-  appearSpeed: 0.08             // qué tan rápido "crecen" las nuevas al aparecer
+//Particulas
+const MINIS = {
+  count: 30, //cantidad
+  maxCount: 100, //máxima cantidad 
+  spikeCount: 14,
+  spikeLength: 1.0,
+  spikeWidth: 0.32,
+  size: 0.1,
+  minRadius: 2.3, //distancia minima al centro
+  maxRadius: 3.3, //distancia maxima al centro
+  height: 1.8, //que tan arriba o abajo pueden aparecer
+  followHead: 0.3, // cuanto siguen al mouse
+  appearSpeed: 0.08
 };
 
 const PUSH = {                  // empujar las mini estrellas con el mouse
@@ -100,81 +101,75 @@ const PUSH = {                  // empujar las mini estrellas con el mouse
 
 const TIME_ZONE = "America/Mexico_City";
 
-// Cada ojo es un objeto con sus propias propiedades:
-//   x, y → dirección en la cara frontal (0, 0 = centro de la cara)
-//   size → mitad del ancho del diamante
+
+
+//------Ojos------
 const EYES = [
   { x: -0.38, y:  0.22, size: 0.17 },   // ojo izquierdo
   { x:  0.38, y:  0.22, size: 0.17 },   // ojo derecho
   { x:  0.00, y:  0.32, size: 0.20 },   // ojo central
 ];
 
-const pupils = [];              // aquí se guardan las pupilas para moverlas en animate()
-const floatingMinis = [];       // aquí se guardan las mini estrellas para moverlas en animate()
-let miniIndex = 0;              // contador para repartir las nuevas alrededor de la cabeza
+const pupils = [];
+const floatingMinis = [];
+let miniIndex = 0;
 
 // Estado del mouse para el empujón
 let isPointerInside = false;    // solo empuja si el mouse está dentro de la ventana
 let pointerSpeed = 0;           // velocidad del mouse suavizada
 const lastPointer = { x: 0, y: 0 };
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Escena 3D ---------------------------------------------------------------
+//---------Escena----------
 const scene = new THREE.Scene();
 
+//-------Camara------
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
 camera.position.z = 6;
 
+//------Renderer------
 const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // tope en 2: pantallas retina sin castigar el rendimiento
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-// Timer: reemplaza a THREE.Clock (que ya está obsoleto)
+//------Timer: reemplaza a THREE.Clock------ 
 const timer = new THREE.Timer();
 
-// Raycaster: convierte el mouse en un rayo dentro de la escena 3D
+//------Raycaster------
 const raycaster = new THREE.Raycaster();
 const pointerNDC = new THREE.Vector2();
 
-// Vectores reutilizables (crearlos una vez es más rápido que en cada cuadro)
+//------Vectores reutilizables------
 const tmpOrbit = new THREE.Vector3();
 const tmpWorld = new THREE.Vector3();
 const tmpClosest = new THREE.Vector3();
 const tmpPush = new THREE.Vector3();
 const tmpInverseQuat = new THREE.Quaternion();
 
-// Luces: sin luz, MeshStandardMaterial se ve negro
+//------Luces------
 const ambientLight = new THREE.AmbientLight("#ffffff", 0.6);
 scene.add(ambientLight);
 
-const keyLight = new THREE.DirectionalLight("#ffffff", 3);     // luz principal
+const keyLight = new THREE.DirectionalLight("#ffffff", 3);
 keyLight.position.set(3, 4, 5);
 scene.add(keyLight);
 
-const rimLight = new THREE.DirectionalLight("#4fd8ff", 2);     // luz de contorno por detrás
+const rimLight = new THREE.DirectionalLight("#4fd8ff", 2);
 rimLight.position.set(-4, 2, -4);
 scene.add(rimLight);
 
-// Canvas responsivo: cámara y renderer siguen el tamaño de la ventana
+//------Canvas responsivo------
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// HUD: coordenadas del puntero ---------------------------------------------------------------
+//----------Coordenadas del puntero---------
 function updatePointerReadout() {
   if (!pointerCoordsContainer || !pointerNormalizedContainer) return;
 
@@ -187,15 +182,11 @@ function updatePointerReadout() {
   pointerCoordsContainer.innerText = `X ${pointerData.x} · Y ${pointerData.y}`;
   pointerNormalizedContainer.innerText =
     `NX ${normalizedPointer.x.toFixed(2)} · NY ${normalizedPointer.y.toFixed(2)}`;
-}
-// -------------------------------------------------------------------------
+};
 
 
 
-
-
-
-// HUD: fecha, hora y zona horaria de la Ciudad de México ---------------------------------------------------------------
+//----------HUD: fecha, hora y zona horaria de la Ciudad de México---------
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: TIME_ZONE,
   weekday: "short",
@@ -237,16 +228,10 @@ function updateClock() {
 
 updateClock();
 setInterval(updateClock, 1000);   // se actualiza cada segundo
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Forma puntiaguda reutilizable: esfera facetada + picos ---------------------------------------------------------------
-// La usan la cabeza y las mini estrellas. Siempre se construye a tamaño 1;
-// después se escala con .scale para hacerla más grande o más chica.
+//---------Forma---------
 function createSpikyBall({ spikeCount, spikeLength, spikeWidth, frontGap, material }) {
   const ball = new THREE.Group();
 
@@ -255,39 +240,35 @@ function createSpikyBall({ spikeCount, spikeLength, spikeWidth, frontGap, materi
 
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));  // reparte puntos de forma pareja en la esfera
   const up = new THREE.Vector3(0, 1, 0);
-  const spikeGeometry = new THREE.ConeGeometry(spikeWidth, spikeLength, 4); // 4 lados = pirámide puntiaguda
+  const spikeGeometry = new THREE.ConeGeometry(spikeWidth, spikeLength, 4);
 
   for (let i = 0; i < spikeCount; i++) {
-    const y = 1 - (i / (spikeCount - 1)) * 2;        // de arriba (1) a abajo (-1)
+    const y = 1 - (i / (spikeCount - 1)) * 2;
     const radius = Math.sqrt(1 - y * y);
     const theta = goldenAngle * i;
 
     const direction = new THREE.Vector3(Math.cos(theta) * radius, y, Math.sin(theta) * radius);
 
-    if (direction.z > frontGap) continue;            // deja libre la cara frontal (si se pide)
+    if (direction.z > frontGap) continue;//deja libre la cara frontal
 
     const spike = new THREE.Mesh(spikeGeometry, material);
-    spike.quaternion.setFromUnitVectors(up, direction);              // apunta hacia afuera
+    spike.quaternion.setFromUnitVectors(up, direction); //apunta hacia afuera
     spike.position.copy(direction).multiplyScalar(0.85 + spikeLength / 2);
     ball.add(spike);
   }
 
   return ball;
 }
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Cabeza ---------------------------------------------------------------
-const head = new THREE.Group();   // todo lo que está dentro rota junto
+//---------Cabeza---------
+const head = new THREE.Group(); // todo lo que está dentro rota junto
 scene.add(head);
 
-const headMaterial = new THREE.MeshStandardMaterial({
+const headMaterial = new THREE.MeshStandardMaterial({ //lowpolly
   color: COLORS.head,
-  flatShading: true,              // caras planas = look facetado / low-poly
+  flatShading: true,           
   roughness: 0.45,
   metalness: 0.1
 });
@@ -297,25 +278,21 @@ function createHead() {
     spikeCount: SPIKES.count,
     spikeLength: SPIKES.length,
     spikeWidth: SPIKES.width,
-    frontGap: SPIKES.frontGap,    // sin picos donde van los ojos
+    frontGap: SPIKES.frontGap, // sin picos donde van los ojos
     material: headMaterial
   });
   head.add(body);
 }
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Ojos: diamantes planos con pupila plana ---------------------------------------------------------------
+//---------Ojos---------
 function createDiamond(halfWidth, halfHeight) {
   const shape = new THREE.Shape();
-  shape.moveTo(0, halfHeight);        // punta de arriba
-  shape.lineTo(halfWidth, 0);         // punta derecha
-  shape.lineTo(0, -halfHeight);       // punta de abajo
-  shape.lineTo(-halfWidth, 0);        // punta izquierda
+  shape.moveTo(0, halfHeight); // punta de arriba
+  shape.lineTo(halfWidth, 0); // punta derecha
+  shape.lineTo(0, -halfHeight); // punta de abajo
+  shape.lineTo(-halfWidth, 0); // punta izquierda
   shape.closePath();
 
   return new THREE.ShapeGeometry(shape);
@@ -330,7 +307,7 @@ function createEyes() {
   const pupilMaterial = new THREE.MeshStandardMaterial({
     color: COLORS.pupil,
     roughness: 0.4,
-    polygonOffset: true,              // siempre se dibuja encima del blanco, sin parpadeos
+    polygonOffset: true,  // siempre se dibuja encima del blanco
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1
   });
@@ -338,7 +315,6 @@ function createEyes() {
   EYES.forEach((config) => {
     const direction = new THREE.Vector3(config.x, config.y, 1).normalize();
 
-    // El ojo es un grupo pegado a la superficie y orientado hacia afuera
     const eye = new THREE.Group();
     eye.position.copy(direction).multiplyScalar(1.01);
     eye.lookAt(direction.clone().multiplyScalar(2));
@@ -348,36 +324,32 @@ function createEyes() {
     const pupilHalfWidth = eyeHalfWidth * EYE_SHAPE.pupilSize;
     const pupilHalfHeight = eyeHalfHeight * EYE_SHAPE.pupilSize;
 
-    // Blanco del ojo: diamante plano
+    //---Blanco del ojo---
     const white = new THREE.Mesh(createDiamond(eyeHalfWidth, eyeHalfHeight), eyeMaterial);
     eye.add(white);
 
-    // Pupila: diamante plano, apenas encima del blanco
+    //---Pupila---
     const pupil = new THREE.Mesh(createDiamond(pupilHalfWidth, pupilHalfHeight), pupilMaterial);
     pupil.position.z = 0.002;
     eye.add(pupil);
 
     pupils.push({
       mesh: pupil,
-      maxX: eyeHalfWidth - pupilHalfWidth,      // espacio libre para moverse a los lados
-      maxY: eyeHalfHeight - pupilHalfHeight     // espacio libre para moverse arriba/abajo
+      maxX: eyeHalfWidth - pupilHalfWidth,
+      maxY: eyeHalfHeight - pupilHalfHeight
     });
 
     head.add(eye);
   });
 }
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Mini estrellas puntiagudas flotantes ---------------------------------------------------------------
-const minisGroup = new THREE.Group();   // separado de la cabeza: no rota igual que ella
+//---------Minis---------
+const minisGroup = new THREE.Group();
 scene.add(minisGroup);
 
-// Un solo material compartido por todas las mini estrellas
+//---Material---
 const miniMaterial = new THREE.MeshStandardMaterial({
   color: COLORS.mini,
   flatShading: true,
@@ -385,36 +357,36 @@ const miniMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.1
 });
 
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));   // reparte las nuevas de forma pareja
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 function randomBetween(min, max) {
   return min + Math.random() * (max - min);
 }
 
-// Crea UNA mini estrella y la agrega a la escena
+
 function addMini() {
   const mini = createSpikyBall({
     spikeCount: MINIS.spikeCount,
     spikeLength: MINIS.spikeLength,
     spikeWidth: MINIS.spikeWidth,
-    frontGap: 2,                  // 2 = nunca deja hueco: picos por todos lados
+    frontGap: 2,
     material: miniMaterial
   });
 
-  // Cada mini estrella es un objeto con su propio movimiento
+ 
   const config = {
     mesh: mini,
     orbitRadius: randomBetween(MINIS.minRadius, MINIS.maxRadius),
-    orbitAngle: miniIndex * GOLDEN_ANGLE,                    // repartidas alrededor, sin importar cuántas haya
-    orbitSpeed: randomBetween(0.08, 0.25) * (Math.random() < 0.5 ? -1 : 1), // algunas giran al revés
+    orbitAngle: miniIndex * GOLDEN_ANGLE, //repartidas alrededor, sin importar cuántas haya
+    orbitSpeed: randomBetween(0.08, 0.25) * (Math.random() < 0.5 ? -1 : 1), //algunas giran al revés
     baseY: randomBetween(-MINIS.height, MINIS.height),
-    bobSpeed: randomBetween(0.8, 1.6),                       // velocidad del sube y baja
-    bobPhase: Math.random() * Math.PI * 2,                   // para que no floten sincronizadas
+    bobSpeed: randomBetween(0.8, 1.6), // velocidad del sube y baja
+    bobPhase: Math.random() * Math.PI * 2, // para que no floten sincronizadas
     spin: new THREE.Vector3(randomBetween(-0.8, 0.8), randomBetween(-0.8, 0.8), randomBetween(-0.4, 0.4)),
-    scale: MINIS.size * randomBetween(0.6, 1.3),             // tamaños variados
-    appear: 0,                                               // 0 → 1: crece al aparecer
+    scale: MINIS.size * randomBetween(0.6, 1.3), //tamaños
+    appear: 0, //crece al aparecer
 
-    // Física del empujón
+    //Física del empujón
     offset: new THREE.Vector3(),    // qué tan lejos está de su punto en la órbita
     velocity: new THREE.Vector3(),  // velocidad actual del desvío
     spinBoost: 0                    // giro extra después de un golpe
@@ -422,7 +394,7 @@ function addMini() {
 
   miniIndex++;
 
-  mini.scale.setScalar(0);          // empieza invisible y crece en animate()
+  mini.scale.setScalar(0); //empieza invisible y crece en animate()
   mini.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0); // cada una arranca en otra posición
   minisGroup.add(mini);
   floatingMinis.push(config);
@@ -528,14 +500,10 @@ function updateFloatingMinis(time) {
     mini.spinBoost *= 0.95;           // el giro extra se va calmando
   });
 }
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Control de cantidad de partículas ---------------------------------------------------------------
+//---------Control de cantidad de partículas---------
 function updateParticleControl(count) {
   if (!particleSlider || !particleValue) return;
 
@@ -557,20 +525,16 @@ if (particleSlider && particleValue) {
 } else {
   console.warn("No se encontró el slider #particle-count en index.html — se usan " + MINIS.count + " partículas.");
 }
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Cursor / Pointer normalización ---------------------------------------------------------------
+//---------Cursor/pointer (normalizado)---------
 function calculateNormalizedPointer() {
   const windowWidth = window.innerWidth;
   const windowHeight = window.innerHeight;
 
-  normalizedPointer.x = (pointerData.x / windowWidth) * 2 - 1; // Normalize to range [-1, 1]
-  normalizedPointer.y = -(pointerData.y / windowHeight) * 2 + 1; // Normalize to range [-1, 1]
+  normalizedPointer.x = (pointerData.x / windowWidth) * 2 - 1; 
+  normalizedPointer.y = -(pointerData.y / windowHeight) * 2 + 1;
 }
 
 
@@ -581,7 +545,7 @@ function calculateNormalizedLerpPointer() {
   pupilLerpPointer.x += (normalizedPointer.x - pupilLerpPointer.x) * PUPIL_COF;
   pupilLerpPointer.y += (normalizedPointer.y - pupilLerpPointer.y) * PUPIL_COF;
 }
-// -------------------------------------------------------------------------
+
 
 //---1. remapear los valores normalizados y convertirlos en grados.
 function map(valor, inMin, inMax, outMin, outMax) {
@@ -638,14 +602,10 @@ document.documentElement.addEventListener("mouseleave", () => {
 
   updatePointerReadout();
 });
-// -------------------------------------------------------------------------
 
 
 
-
-
-
-// Loop de animación ---------------------------------------------------------------
+//---------Animación---------
 function animate(timestamp) {
   timer.update(timestamp);              // el Timer necesita actualizarse en cada cuadro
   const time = timer.getElapsed();      // segundos desde que empezó
@@ -657,9 +617,8 @@ function animate(timestamp) {
   head.rotation.x = THREE.MathUtils.degToRad(headRotation.x);
   head.rotation.y = THREE.MathUtils.degToRad(headRotation.y);
 
-  head.position.y = Math.sin(time * 1.5) * 0.06;   // flota ligeramente
+  head.position.y = Math.sin(time * 1.5) * 0.06; //flota 
 
-  // Las mini estrellas siguen al mouse solo un poco (sensación de profundidad)
   minisGroup.rotation.x = THREE.MathUtils.degToRad(headRotation.x * MINIS.followHead);
   minisGroup.rotation.y = THREE.MathUtils.degToRad(headRotation.y * MINIS.followHead);
 
@@ -674,4 +633,3 @@ createHead();
 createEyes();
 setMiniCount(MINIS.count);
 requestAnimationFrame(animate);
-// -------------------------------------------------------------------------
